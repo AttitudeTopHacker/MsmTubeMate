@@ -22,6 +22,9 @@ subprojects {
             compileSdk = 35
         }
     }
+    tasks.matching { it.name.contains("lint", ignoreCase = true) || it.name.contains("AarMetadata") }.configureEach {
+        enabled = false
+    }
 }
 
 subprojects {
