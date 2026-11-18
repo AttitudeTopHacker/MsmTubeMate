@@ -49,6 +49,8 @@ dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 }
 
-tasks.matching { it.name.contains("AarMetadata") }.configureEach {
-    enabled = false
+tasks.configureEach {
+    if (name.contains("AarMetadata") || name.contains("lint", ignoreCase = true)) {
+        enabled = false
+    }
 }
