@@ -1,0 +1,118 @@
+name: Build Android APK and Linux Release
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-android:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'gradle'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Accept Android Licenses
+        run: |
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
+
+      - name: Get Dependencies
+        run: flutter pub get
+
+      - name: Build Android Release APK
+        run: flutter build apk --release
+
+      - name: Upload Release APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: MsmTubeMate-Release-APK
+          path: build/app/outputs/flutter-apk/app-release.apk
+
+  build-linux-deb:
+    name: Build Linux .deb Package
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Install Linux Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev dpkg-dev
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Enable Linux Desktop
+        run: flutter config --enable-linux-desktop
+
+      - name: Get Dependencies
+        run: flutter pub get
+
+      - name: Build Linux Release
+        run: flutter build linux --release
+
+      - name: Package .deb File
+        run: |
+          mkdir -p debian_pkg/DEBIAN
+          mkdir -p debian_pkg/usr/bin
+          mkdir -p debian_pkg/usr/lib/msm_tubemate
+          mkdir -p debian_pkg/usr/share/applications
+          mkdir -p debian_pkg/usr/share/pixmaps
+
+          cp -r build/linux/x64/release/bundle/* debian_pkg/usr/lib/msm_tubemate/
+          ln -s /usr/lib/msm_tubemate/msm_tubemate debian_pkg/usr/bin/msm-tubemate
+
+          cat << 'EOF' > debian_pkg/DEBIAN/control
+          Package: msm-tubemate
+          Version: 2.0.0
+          Section: utils
+          Priority: optional
+          Architecture: amd64
+          Maintainer: msm.movin <support@msmmovin.com>
+          Description: Msm TubeMate - Smart Multi-Platform Media & Audio Downloader
+           ORG: msm.movin 2022. Supports 4K/2K/1080p, Playlists, MP3/M4A, Instagram, Twitter, and WhatsApp.
+          EOF
+
+          chmod 755 debian_pkg/DEBIAN
+          chmod 644 debian_pkg/DEBIAN/control
+
+          cat << 'EOF' > debian_pkg/usr/share/applications/msm-tubemate.desktop
+          [Desktop Entry]
+          Name=Msm TubeMate
+          Comment=Smart Downloader ORG: msm.movin 2022
+          Exec=msm-tubemate
+          Icon=msm-tubemate
+          Terminal=false
+          Type=Application
+          Categories=Network;AudioVideo;
+          EOF
+
+          dpkg-deb --build debian_pkg MsmTubeMate-2.0.0-amd64.deb
+
+      - name: Upload Debian Package Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: MsmTubeMate-Linux-deb
+          path: MsmTubeMate-2.0.0-amd64.deb
