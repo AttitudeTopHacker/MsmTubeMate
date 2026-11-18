@@ -40,7 +40,30 @@ jobs:
         run: flutter pub get
 
       - name: Build Android Release APK
-        run: flutter build apk --release --android-skip-build-dependency-validation
+        run: |
+          flutter build apk --release --android-skip-build-dependency-validation --verbose > build_apk.log 2>&1 || {
+            echo "::group::Gradle Build Failure Log"
+            tail -n 120 build_apk.log
+            echo "::endgroup::"
+            exit 1
+          }
+
+      - name: Report Build Failure Summary
+        if: failure()
+        run: |
+          if [ -f build_apk.log ]; then
+            echo "### ❌ Android Build Failure Details" >> $GITHUB_STEP_SUMMARY
+            echo '```text' >> $GITHUB_STEP_SUMMARY
+            grep -B 3 -A 40 "* What went wrong:" build_apk.log >> $GITHUB_STEP_SUMMARY || tail -n 80 build_apk.log >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Upload Build Log on Failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-build-failure-log
+          path: build_apk.log
 
       - name: Upload Release APK Artifact
         uses: actions/upload-artifact@v4
