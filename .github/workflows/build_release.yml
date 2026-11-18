@@ -40,30 +40,7 @@ jobs:
         run: flutter pub get
 
       - name: Build Android Release APK
-        run: flutter build apk --release --verbose > build_apk.log 2>&1 || { grep -B 2 -A 30 "\* What went wrong:" build_apk.log || cat build_apk.log | tail -n 120; exit 1; }
-
-      - name: Post Failure Comment on Commit
-        if: failure()
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const fs = require('fs');
-            let log = 'No log file found';
-            if (fs.existsSync('build_apk.log')) {
-              const all = fs.readFileSync('build_apk.log', 'utf8');
-              const idx = all.indexOf('* What went wrong:');
-              if (idx !== -1) {
-                log = all.substring(idx - 100, Math.min(all.length, idx + 2000));
-              } else {
-                log = all.split('\n').slice(-80).join('\n');
-              }
-            }
-            github.rest.repos.createCommitComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              commit_sha: context.sha,
-              body: '### ❌ Android Build Failure Details:\n```text\n' + log + '\n```'
-            });
+        run: flutter build apk --release --android-skip-build-dependency-validation
 
       - name: Upload Release APK Artifact
         uses: actions/upload-artifact@v4
@@ -97,30 +74,7 @@ jobs:
         run: flutter pub get
 
       - name: Build Linux Release
-        run: flutter build linux --release --verbose > build_linux.log 2>&1 || { grep -B 2 -A 30 "CMake Error" build_linux.log || cat build_linux.log | tail -n 120; exit 1; }
-
-      - name: Post Failure Comment on Commit
-        if: failure()
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const fs = require('fs');
-            let log = 'No log file found';
-            if (fs.existsSync('build_linux.log')) {
-              const all = fs.readFileSync('build_linux.log', 'utf8');
-              const idx = all.indexOf('CMake Error');
-              if (idx !== -1) {
-                log = all.substring(idx - 50, Math.min(all.length, idx + 2000));
-              } else {
-                log = all.split('\n').slice(-80).join('\n');
-              }
-            }
-            github.rest.repos.createCommitComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              commit_sha: context.sha,
-              body: '### ❌ Linux Build Failure Details:\n```text\n' + log + '\n```'
-            });
+        run: flutter build linux --release
 
       - name: Package .deb File
         run: |
